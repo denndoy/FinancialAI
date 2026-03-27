@@ -2,6 +2,8 @@
 
 Next.js 14 (App Router) application for personal finance tracking with receipt ingestion, OCR extraction, transaction classification, and analytics dashboard. Recommended hosting is Vercel, with Azure services for storage and OCR.
 
+Panduan go-live lengkap: `PANDUAN_GO_LIVE_VERCEL.md`
+
 ## Target architecture
 
 - Hosting: Vercel
