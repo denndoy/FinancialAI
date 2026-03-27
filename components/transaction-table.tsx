@@ -87,14 +87,16 @@ export function TransactionTable({ transactions, onChanged }: Props) {
             ? `${selectedIds.length} ${tr("tx.selected")}`
             : tr("tx.noSelected")}
         </p>
-        <button
-          type="button"
-          disabled={loading || selectedIds.length === 0}
-          onClick={() => void removeSelected()}
-          className="rounded-lg border border-destructive/40 px-3 py-1.5 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? tr("tx.deletingSelected") : tr("tx.deleteSelected")}
-        </button>
+        {selectedIds.length > 1 && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void removeSelected()}
+            className="rounded-lg border border-destructive/40 px-3 py-1.5 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? tr("tx.deletingSelected") : tr("tx.deleteSelected")}
+          </button>
+        )}
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="overflow-x-auto rounded-xl border border-border">
