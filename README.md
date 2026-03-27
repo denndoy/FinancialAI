@@ -111,6 +111,21 @@ If OCR fails, the API returns fallback metadata so manual entry remains availabl
    - Rotate credentials periodically
    - Keep running `prisma migrate deploy` for each release with new migrations
 
+## Auto migrate production DB (GitHub Actions)
+
+To avoid manual migration runs on every schema change, this repo includes workflow:
+
+- `.github/workflows/prisma-migrate-deploy.yml`
+
+How to enable:
+
+1. Open GitHub repo -> Settings -> Secrets and variables -> Actions.
+2. Add secret: `PRODUCTION_DATABASE_URL` (your production PostgreSQL URL).
+3. Push migration files (`prisma/migrations/**`) to `main`.
+4. Workflow will run `npx prisma migrate deploy` automatically.
+
+You can also run it manually from GitHub Actions using `workflow_dispatch`.
+
 ## Azure App Service deployment guide (alternative)
 
 1. Create Azure resources:
