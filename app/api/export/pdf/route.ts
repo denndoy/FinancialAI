@@ -245,7 +245,7 @@ export async function GET(req: Request) {
                 content: "Belum ada transaksi pada periode ini",
                 colSpan: 5,
                 styles: {
-                  halign: "center",
+                  halign: "center" as const,
                   textColor: BRAND.slate,
                 },
               },

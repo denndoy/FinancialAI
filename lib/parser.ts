@@ -20,7 +20,7 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   const merchant = extractMerchant(lines, rawText);
   const products = extractProductDescriptions(lines);
   const date = extractDate(rawText);
-  const total = extractReceiptTotal(lines, rawText);
+    const total = extractReceiptTotal(lines);
 
   return { total, date, merchant, products };
 }
@@ -196,7 +196,7 @@ function extractLargestAmount(text: string): number | null {
   return Math.max(...candidates);
 }
 
-function extractReceiptTotal(lines: string[], rawText: string): number | null {
+function extractReceiptTotal(lines: string[]): number | null {
   // Focus on footer section only (last 15 lines where total/cash/change always appear)
   const footerStart = Math.max(0, lines.length - 15);
   const footerLines = lines.slice(footerStart);

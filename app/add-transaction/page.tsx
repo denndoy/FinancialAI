@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLocale } from "@/components/locale-provider";
@@ -197,11 +198,16 @@ export default function AddTransactionPage() {
         {evidencePreviewUrl && (
           <div className="rounded-lg border border-border p-3">
             <p className="mb-2 text-xs text-muted-foreground">{t("addTx.evidencePreview")}</p>
-            <img
-              src={evidencePreviewUrl}
-              alt={t("addTx.evidenceAlt")}
-              className="max-h-56 w-full rounded-md object-contain"
-            />
+            <div className="relative h-56 w-full overflow-hidden rounded-md">
+              <Image
+                src={evidencePreviewUrl}
+                alt={t("addTx.evidenceAlt")}
+                fill
+                unoptimized
+                sizes="(max-width: 768px) 100vw, 640px"
+                className="object-contain"
+              />
+            </div>
             <button
               type="button"
               onClick={() => onEvidenceFileChange(null)}
