@@ -1,12 +1,14 @@
 # AI Personal Finance Tracker (Receipt Scanner)
 
-Production-oriented Next.js 14 (App Router) app: auth, manual transactions, receipt upload with **Tesseract.js OCR on the Node.js runtime** (not Edge), Azure Blob storage, PostgreSQL via Prisma with pooling-friendly config, keyword-based `classifyTransaction` (swappable for ML later), Recharts dashboard, and CSV export.
+Next.js 14 (App Router) application for personal finance tracking with receipt ingestion, OCR extraction, transaction classification, and analytics dashboard. Recommended hosting is Vercel, with Azure services for storage and OCR.
 
-## Prerequisites
+## Target architecture
 
-- Node.js 20+ (LTS recommended for Vercel parity)
-- PostgreSQL (e.g. DigitalOcean Managed Database)
-- Azure Storage account + blob container
+- Hosting: Vercel
+- Database: Azure Database for PostgreSQL
+- Storage: Azure Blob Storage
+- OCR: Azure Computer Vision Read API
+- Framework: Next.js 14 + NextAuth + Prisma
 
 ## Environment variables
 
@@ -14,11 +16,13 @@ Copy `.env.example` to `.env` and set:
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Postgres connection string. For **DigitalOcean + PgBouncer**, append `?sslmode=require&pgbouncer=true&connection_limit=1` (adjust query params per DO docs). |
+| `DATABASE_URL` | Azure PostgreSQL connection string (`sslmode=require`). Use pooled URL params for serverless/app-service workloads. |
 | `NEXTAUTH_SECRET` | Random secret, e.g. `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | Local: `http://localhost:3000` — Production: your Vercel URL |
-| `AZURE_STORAGE_CONNECTION_STRING` | From Azure Portal → Storage Account → Access keys |
-| `AZURE_CONTAINER_NAME` | Container name (app creates it with **public blob** read if missing) |
+| `NEXTAUTH_URL` | App base URL (local: `http://localhost:3000`, production: your App Service URL or custom domain) |
+| `AZURE_STORAGE_CONNECTION_STRING` | Azure Storage account connection string |
+| `AZURE_CONTAINER_NAME` | Blob container for receipt images |
+| `AZURE_VISION_ENDPOINT` | Azure Vision endpoint, e.g. `https://<resource-name>.cognitiveservices.azure.com` |
+| `AZURE_VISION_KEY` | Azure Vision API key |
 
 ## Local setup
 
@@ -28,62 +32,131 @@ Copy `.env.example` to `.env` and set:
    npm install
    ```
 
-2. Configure `.env` (see above).
+2. Configure `.env`.
 
-3. Apply database schema:
+3. Apply DB schema:
 
    ```bash
-   npx prisma migrate deploy
+   npm run db:deploy
    ```
 
-   Or during development: `npm run db:migrate` (interactive).
-
-4. Run the dev server:
+4. Start the app:
 
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:3000](http://localhost:3000), register, then use **Dashboard**, **Scan receipt**, and **Add transaction**.
+## Receipt pipeline
 
-## Project layout (core)
+Current flow:
 
-- `app/` — routes: `/login`, `/register`, `/dashboard`, `/upload-receipt`, `/add-transaction`, API routes under `app/api/`
-- `components/` — UI (nav, charts, transaction table, theme)
-- `lib/` — `db.ts`, `azure.ts`, `ocr.ts`, `parser.ts`, `ai.ts`, `auth.ts`, `insights.ts`
-- `prisma/schema.prisma` — `User`, `Transaction`
+1. Browser compresses image before upload.
+2. API uploads image to Azure Blob Storage.
+3. API calls Azure Vision Read API (URL mode, then binary fallback).
+4. OCR text is parsed for merchant/date/amount.
+5. Category is classified through modular logic in `lib/ai.ts`.
+6. User can review/edit fields, then save to PostgreSQL.
 
-## API (all expect session cookie except register)
+If OCR fails, the API returns fallback metadata so manual entry remains available.
 
-- `POST /api/register` — body: `{ email, password }`
-- `POST /api/transactions` — create transaction
-- `GET /api/transactions` — optional `?month=YYYY-MM&=q=`
-- `PUT /api/transactions/:id` — update
-- `DELETE /api/transactions/:id` — delete
-- `GET /api/dashboard` — optional `?month=YYYY-MM`
-- `POST /api/upload-receipt` — `multipart/form-data` field `file` (Node runtime, OCR + Azure)
-- `GET /api/export/csv` — optional `?month=YYYY-MM`
+## API summary
 
-## Production notes
+- `POST /api/register`
+- `POST /api/transactions`
+- `GET /api/transactions?month=YYYY-MM&q=...`
+- `PUT /api/transactions/:id`
+- `DELETE /api/transactions/:id`
+- `GET /api/dashboard?month=YYYY-MM`
+- `POST /api/upload-receipt`
+- `GET /api/export/csv?month=YYYY-MM`
+- `GET /api/export/pdf?month=YYYY-MM`
 
-- **OCR**: Implemented in `app/api/upload-receipt/route.ts` with `export const runtime = "nodejs"`. On Vercel, increase **max duration** if needed (Pro); Tesseract downloads language data on first run (cold start).
-- **Images**: Client compresses with `browser-image-compression`; server recompresses with `sharp` if still over ~1 MB.
-- **Prisma**: Singleton in `lib/db.ts` for serverless; use pooled `DATABASE_URL` for many concurrent lambdas.
+## Vercel deployment guide (recommended)
 
-## Deploy to Vercel
+1. Push code to GitHub and ensure latest Prisma migration is committed.
 
-1. Push the repo to GitHub.
-2. Import the project in [Vercel](https://vercel.com).
-3. Set the same env vars as in `.env.example` (use production `NEXTAUTH_URL` and real DB/Azure secrets).
-4. Build command: `prisma generate && next build` (already in `package.json` `build` script).
-5. Run migrations against production DB from CI or locally:
+2. Import repository in Vercel:
+   - New Project -> Import Git Repository
+   - Framework preset: Next.js (auto)
+   - Build command: `npm run build`
+   - Install command: `npm install`
+
+3. Set production environment variables in Vercel Project Settings:
+   - `DATABASE_URL`
+   - `NEXTAUTH_SECRET`
+   - `NEXTAUTH_URL` (your production domain)
+   - `AZURE_STORAGE_CONNECTION_STRING`
+   - `AZURE_CONTAINER_NAME`
+   - `AZURE_VISION_ENDPOINT`
+   - `AZURE_VISION_KEY`
+   - `ADMIN_USERNAME` (optional)
+
+4. Run Prisma migration against production database (outside Vercel build):
 
    ```bash
    DATABASE_URL="postgresql://..." npx prisma migrate deploy
    ```
 
-6. Smoke-test: register, add transaction, upload receipt (Azure + OCR).
+5. Deploy to production from Vercel dashboard or git push.
+
+6. Verify end-to-end:
+   - Register/login works
+   - Upload receipt works (Blob + OCR)
+   - Save transaction works
+   - Dashboard + chart + search work
+   - CSV/PDF export work
+
+7. After go-live:
+   - Add monitoring/alerts in Vercel and Azure
+   - Rotate credentials periodically
+   - Keep running `prisma migrate deploy` for each release with new migrations
+
+## Azure App Service deployment guide (alternative)
+
+1. Create Azure resources:
+   - Resource Group
+   - Azure Database for PostgreSQL (Flexible Server)
+   - Azure Storage Account + Blob container
+   - Azure AI Vision resource
+   - Azure App Service Plan + Web App (Linux, Node 20)
+
+2. Configure PostgreSQL:
+   - Create DB and user.
+   - Open firewall/network rules for App Service outbound access.
+   - Set `DATABASE_URL` using SSL (`sslmode=require`) and pooling params.
+
+3. Configure App Service settings:
+   - Add all env vars from `.env.example` in App Service Configuration.
+   - Set `WEBSITE_NODE_DEFAULT_VERSION` to `~20` if needed.
+
+4. Run Prisma migrations for production DB:
+
+   ```bash
+   DATABASE_URL="postgresql://..." npx prisma migrate deploy
+   ```
+
+5. Deploy from GitHub:
+   - Push repository to GitHub.
+   - In Azure Portal: Web App -> Deployment Center.
+   - Select GitHub provider, authorize, choose repo and branch.
+   - Build provider: App Service build service (Oryx).
+   - Ensure build command runs `npm install` and `npm run build`.
+
+6. Post-deploy checks:
+   - Register/login flow works.
+   - Upload receipt completes with OCR or manual fallback.
+   - Transactions save to DB.
+   - Dashboard totals and charts are accurate.
+   - CSV/PDF exports download correctly.
+
+## Production hardening checklist
+
+- Keep secrets only in App Service configuration.
+- Enable HTTPS only and configure custom domain + TLS certificate.
+- Add Azure Monitor / Application Insights.
+- Configure backup/retention for PostgreSQL.
+- Restrict storage account networking where possible.
 
 ## Stack
 
-Next.js 14, Tailwind CSS, Prisma 5, PostgreSQL, NextAuth (credentials), Azure Blob Storage, Tesseract.js, Recharts, Sharp, Zod.
+Next.js 14, Tailwind CSS, Prisma 5, PostgreSQL (Azure), NextAuth, Azure Blob Storage, Azure Vision Read API, Recharts, Sharp, Zod.

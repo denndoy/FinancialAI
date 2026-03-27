@@ -9,21 +9,27 @@ import { useLocale } from "@/components/locale-provider";
 export default function RegisterPage() {
   const { t } = useLocale();
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    if (password !== confirmPassword) {
+      setError(t("register.passwordMismatch"));
+      return;
+    }
+    setLoading(true);
     try {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -31,7 +37,7 @@ export default function RegisterPage() {
         return;
       }
       const sign = await signIn("credentials", {
-        email,
+        username,
         password,
         redirect: false,
       });
@@ -57,13 +63,16 @@ export default function RegisterPage() {
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
         {error && <p className="text-sm text-destructive">{error}</p>}
         <label className="block text-sm">
-          <span className="text-muted-foreground">{t("register.email")}</span>
+          <span className="text-muted-foreground">{t("register.username")}</span>
           <input
-            type="email"
+            type="text"
             required
+            minLength={3}
+            maxLength={32}
+            autoComplete="username"
             className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
           />
         </label>
         <label className="block text-sm">
@@ -85,6 +94,62 @@ export default function RegisterPage() {
               className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               {showPassword ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 3l18 18" />
+                  <path d="M10.58 10.58A3 3 0 0 0 12 15a3 3 0 0 0 2.42-4.42" />
+                  <path d="M9.88 5.11A10.43 10.43 0 0 1 12 5c7 0 11 7 11 7-1.06 1.77-2.35 3.17-3.63 4.16" />
+                  <path d="M6.11 6.11A18.3 18.3 0 0 0 1 12s4 7 11 7c1.06 0 2.07-.16 3.03-.47" />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </label>
+        <label className="block text-sm">
+          <span className="text-muted-foreground">{t("register.confirmPassword")}</span>
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              required
+              minLength={8}
+              className="flex-1 rounded-lg border border-border bg-background px-3 py-2"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((s) => !s)}
+              aria-label={showConfirmPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+              title={showConfirmPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+              className="inline-flex items-center justify-center rounded-lg border border-border px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {showConfirmPassword ? (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="18"

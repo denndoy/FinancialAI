@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Transaction } from "@prisma/client";
 import { useLocale } from "@/components/locale-provider";
 import { formatIdr } from "@/lib/format-idr";
@@ -15,6 +15,28 @@ export function TransactionTable({ transactions, onChanged }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isZoomed, setIsZoomed] = useState(false);
+
+  useEffect(() => {
+    if (!previewImage) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPreviewImage(null);
+        setIsZoomed(false);
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [previewImage]);
 
   async function remove(id: string) {
     if (!confirm(tr("tx.confirmDelete"))) return;
@@ -70,19 +92,22 @@ export function TransactionTable({ transactions, onChanged }: Props) {
                 </td>
                 <td className="px-4 py-3">
                   {tx.imageUrl ? (
-                    <a
-                      href={tx.imageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewImage(tx.imageUrl);
+                        setIsZoomed(false);
+                      }}
+                      className="inline-block rounded-md transition-transform hover:scale-105"
+                      aria-label={tr("tx.preview.openAria")}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={tx.imageUrl}
-                        alt=""
+                        alt={tr("tx.preview.thumbnailAlt")}
                         className="h-10 w-10 rounded-md object-cover ring-1 ring-border"
                       />
-                    </a>
+                    </button>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -119,6 +144,55 @@ export function TransactionTable({ transactions, onChanged }: Props) {
             onChanged();
           }}
         />
+      )}
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => {
+            setPreviewImage(null);
+            setIsZoomed(false);
+          }}
+        >
+          <div
+            className="relative flex max-h-[92vh] w-full max-w-6xl flex-col rounded-xl border border-white/20 bg-black/60 p-3 backdrop-blur"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm text-white/85">{tr("tx.preview.title")}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsZoomed((v) => !v)}
+                  className="rounded-md border border-white/30 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+                >
+                  {isZoomed ? tr("tx.preview.zoomOut") : tr("tx.preview.zoomIn")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewImage(null);
+                    setIsZoomed(false);
+                  }}
+                  className="rounded-md border border-white/30 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10"
+                >
+                  {tr("tx.preview.close")}
+                </button>
+              </div>
+            </div>
+            <div className="overflow-auto rounded-lg bg-black/50 p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewImage}
+                alt={tr("tx.preview.fullAlt")}
+                className={`mx-auto max-h-[78vh] w-auto rounded-md object-contain transition-transform duration-200 ${
+                  isZoomed ? "scale-125" : "scale-100"
+                }`}
+              />
+            </div>
+            <p className="mt-2 text-xs text-white/70">{tr("tx.preview.tip")}</p>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -81,11 +81,43 @@ export async function POST(req: Request) {
       parsed.data.imageUrl && parsed.data.imageUrl.length > 0 ? parsed.data.imageUrl : null;
 
     const category = categoryForDb(parsed.data.type, parsed.data.category);
+    const amountDecimal = new Prisma.Decimal(parsed.data.amount);
+
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const duplicate = await prisma.transaction.findFirst({
+      where: {
+        userId: session.user.id,
+        type: parsed.data.type,
+        amount: amountDecimal,
+        date: { gte: dayStart, lte: dayEnd },
+        OR: [
+          ...(imageUrl ? [{ imageUrl }] : []),
+          { description: { equals: parsed.data.description, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          error:
+            "Transaksi duplikat terdeteksi (deskripsi/struk, nominal, tipe, dan tanggal sama).",
+          duplicateTransactionId: duplicate.id,
+        },
+        { status: 409 }
+      );
+    }
 
     const tx = await prisma.transaction.create({
       data: {
         description: parsed.data.description,
-        amount: new Prisma.Decimal(parsed.data.amount),
+        amount: amountDecimal,
         category,
         type: parsed.data.type,
         date,

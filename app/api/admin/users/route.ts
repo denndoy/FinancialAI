@@ -13,7 +13,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
-        email: true,
+        username: true,
         isAdmin: true,
         createdAt: true,
         _count: { select: { transactions: true } },
@@ -23,7 +23,7 @@ export async function GET() {
     return NextResponse.json({
       users: users.map((u) => ({
         id: u.id,
-        email: u.email,
+        username: u.username,
         isAdmin: u.isAdmin,
         createdAt: u.createdAt.toISOString(),
         transactionCount: u._count.transactions,

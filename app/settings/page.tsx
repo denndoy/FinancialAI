@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useState } from "react";
+import { signOut } from "next-auth/react";
 import { useLocale } from "@/components/locale-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,7 @@ export default function SettingsPage() {
         <h2 className="text-sm font-medium text-foreground">{t("settings.account")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t("settings.accountHint")}</p>
         <p className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
-          {session?.user?.email ?? "—"}
+          {session?.user?.username ?? "—"}
         </p>
       </section>
 
@@ -301,6 +302,16 @@ export default function SettingsPage() {
             {loading ? t("settings.saving") : t("settings.savePassword")}
           </button>
         </form>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          {t("settings.signOut")}
+        </button>
       </section>
     </div>
   );

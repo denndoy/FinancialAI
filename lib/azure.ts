@@ -1,4 +1,8 @@
 import { BlobServiceClient } from "@azure/storage-blob";
+import { randomUUID } from "crypto";
+
+const UPLOAD_MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 300;
 
 function requireEnv(name: string): string {
   const v = process.env[name];
@@ -19,7 +23,7 @@ export async function uploadReceiptImage(
   const containerName = requireEnv("AZURE_CONTAINER_NAME");
 
   const safeName = filenameHint.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const blobName = `${Date.now()}-${safeName}`;
+  const blobName = `${Date.now()}-${randomUUID()}-${safeName}`;
 
   const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
   const containerClient = blobServiceClient.getContainerClient(containerName);
@@ -29,9 +33,21 @@ export async function uploadReceiptImage(
   });
 
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-  await blockBlobClient.uploadData(buffer, {
-    blobHTTPHeaders: { blobContentType: contentType || "image/jpeg" },
-  });
 
-  return blockBlobClient.url;
+  for (let attempt = 1; attempt <= UPLOAD_MAX_RETRIES; attempt += 1) {
+    try {
+      await blockBlobClient.uploadData(buffer, {
+        blobHTTPHeaders: { blobContentType: contentType || "image/jpeg" },
+      });
+      return blockBlobClient.url;
+    } catch (error) {
+      if (attempt >= UPLOAD_MAX_RETRIES) {
+        throw error;
+      }
+      const delay = INITIAL_RETRY_DELAY_MS * 2 ** (attempt - 1);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw new Error("Azure upload failed after retries");
 }

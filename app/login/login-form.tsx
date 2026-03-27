@@ -11,7 +11,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function LoginForm() {
     setLoading(true);
     setError(null);
     const res = await signIn("credentials", {
-      email,
+      username,
       password,
       redirect: false,
     });
@@ -44,14 +44,14 @@ export function LoginForm() {
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
         {error && <p className="text-sm text-destructive">{error}</p>}
         <label className="block text-sm">
-          <span className="text-muted-foreground">{t("login.email")}</span>
+          <span className="text-muted-foreground">{t("login.username")}</span>
           <input
-            type="email"
+            type="text"
             required
-            autoComplete="email"
+            autoComplete="username"
             className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
           />
         </label>
         <label className="block text-sm">

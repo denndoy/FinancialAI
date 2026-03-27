@@ -7,7 +7,7 @@ import { useLocale } from "@/components/locale-provider";
 
 type UserRow = {
   id: string;
-  email: string;
+  username: string;
   isAdmin: boolean;
   createdAt: string;
   transactionCount: number;
@@ -73,7 +73,7 @@ export default function AdminPage() {
   }
 
   async function removeUser(u: UserRow) {
-    if (!confirm(t("admin.confirmDelete").replace("{email}", u.email))) return;
+    if (!confirm(t("admin.confirmDelete").replace("{username}", u.username))) return;
     setBusyId(u.id);
     setError(null);
     try {
@@ -147,7 +147,7 @@ export default function AdminPage() {
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
-                <th className="px-4 py-3 font-medium">{t("admin.colEmail")}</th>
+                <th className="px-4 py-3 font-medium">{t("admin.colUsername")}</th>
                 <th className="px-4 py-3 font-medium">{t("admin.colJoined")}</th>
                 <th className="px-4 py-3 font-medium text-right">{t("admin.colTx")}</th>
                 <th className="px-4 py-3 font-medium">{t("admin.colAdmin")}</th>
@@ -158,7 +158,7 @@ export default function AdminPage() {
               {users.map((u) => (
                 <tr key={u.id} className="border-t border-border">
                   <td className="px-4 py-3">
-                    <span className="font-medium">{u.email}</span>
+                    <span className="font-medium">{u.username}</span>
                     {u.id === session?.user?.id ? (
                       <span className="ml-2 text-xs text-muted-foreground">({t("admin.you")})</span>
                     ) : null}

@@ -19,6 +19,23 @@ type DashboardPayload = {
   transactions: Transaction[];
 };
 
+type ServiceStatus = "ok" | "warn" | "down";
+type HealthPayload = {
+  overall: ServiceStatus;
+  services: {
+    db: ServiceStatus;
+    storage: ServiceStatus;
+    ocr: ServiceStatus;
+  };
+  checkedAt: string;
+};
+
+const HEALTH_SERVICES: { key: keyof HealthPayload["services"]; labelKey: "dashboard.health.serviceDb" | "dashboard.health.serviceStorage" | "dashboard.health.serviceOcr" }[] = [
+  { key: "db", labelKey: "dashboard.health.serviceDb" },
+  { key: "storage", labelKey: "dashboard.health.serviceStorage" },
+  { key: "ocr", labelKey: "dashboard.health.serviceOcr" },
+];
+
 export function DashboardClient() {
   const { t, locale } = useLocale();
   const [month, setMonth] = useState(() => {
@@ -27,8 +44,24 @@ export function DashboardClient() {
   });
   const [search, setSearch] = useState("");
   const [data, setData] = useState<DashboardPayload | null>(null);
+  const [health, setHealth] = useState<HealthPayload | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadHealth = useCallback(async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch("/api/health", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load health");
+      const json = (await res.json()) as HealthPayload;
+      setHealth(json);
+    } catch {
+      setHealth(null);
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +81,10 @@ export function DashboardClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadHealth();
+  }, [loadHealth]);
 
   const filteredTx = useMemo(() => {
     if (!data?.transactions) return [];
@@ -137,8 +174,100 @@ export function DashboardClient() {
           <CategoryPie data={data.pie} />
         </div>
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="text-lg font-medium">{t("dashboard.healthCheck")}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{t("dashboard.healthText")}</p>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-medium">{t("dashboard.healthCheck")}</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{t("dashboard.healthText")}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadHealth()}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M21 12a9 9 0 1 1-3-6.7" />
+                <polyline points="21 3 21 9 15 9" />
+              </svg>
+              {t("dashboard.healthRefresh")}
+            </button>
+          </div>
+
+          {healthLoading ? (
+            <div className="mt-4 space-y-3">
+              <div className="h-8 animate-pulse rounded-lg bg-muted/70" />
+              <div className="grid grid-cols-3 gap-2">
+                <div className="h-14 animate-pulse rounded-lg bg-muted/60" />
+                <div className="h-14 animate-pulse rounded-lg bg-muted/60" />
+                <div className="h-14 animate-pulse rounded-lg bg-muted/60" />
+              </div>
+              <p className="text-sm text-muted-foreground">{t("dashboard.healthLoading")}</p>
+            </div>
+          ) : !health ? (
+            <p className="mt-2 text-sm text-destructive">{t("dashboard.healthUnavailable")}</p>
+          ) : (
+            <>
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-border/70 bg-background/70 p-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {t("dashboard.healthOverall")}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {t(`dashboard.healthStatus.${health.overall}` as never)}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${statusBadgeTone(
+                    health.overall
+                  )}`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${statusDotTone(health.overall)}`} />
+                  {health.overall.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${healthProgressTone(
+                    health.services
+                  )}`}
+                  style={{ width: `${healthyCount(health.services) * 33.33}%` }}
+                />
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {HEALTH_SERVICES.map((service) => {
+                  const status = health.services[service.key];
+                  return (
+                    <div
+                      key={service.key}
+                      className="rounded-lg border border-border/70 bg-background/60 px-3 py-2"
+                    >
+                      <p className="text-xs text-muted-foreground">{t(service.labelKey)}</p>
+                      <p className="mt-1 inline-flex items-center gap-1 text-sm font-medium">
+                        <span className={`h-2 w-2 rounded-full ${statusDotTone(status)}`} />
+                        {t(`dashboard.healthStatus.${status}` as never)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t("dashboard.health.checkedAt")}: {new Date(health.checkedAt).toLocaleString()}
+              </p>
+            </>
+          )}
         </div>
       </section>
 
@@ -158,6 +287,29 @@ export function DashboardClient() {
       </section>
     </div>
   );
+}
+
+function healthyCount(services: HealthPayload["services"]) {
+  return Object.values(services).filter((s) => s === "ok").length;
+}
+
+function statusBadgeTone(status: ServiceStatus) {
+  if (status === "ok") return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
+  if (status === "warn") return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
+  return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300";
+}
+
+function statusDotTone(status: ServiceStatus) {
+  if (status === "ok") return "bg-emerald-500";
+  if (status === "warn") return "bg-amber-500";
+  return "bg-rose-500";
+}
+
+function healthProgressTone(services: HealthPayload["services"]) {
+  const okCount = healthyCount(services);
+  if (okCount === 3) return "bg-emerald-500";
+  if (okCount >= 1) return "bg-amber-500";
+  return "bg-rose-500";
 }
 
 function StatCard({

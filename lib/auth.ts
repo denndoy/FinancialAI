@@ -13,27 +13,27 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-        const email = String(credentials.email).toLowerCase().trim();
-        const user = await prisma.user.findUnique({ where: { email } });
+        if (!credentials?.username || !credentials?.password) return null;
+        const username = String(credentials.username).trim().toLowerCase();
+        const user = await prisma.user.findUnique({ where: { username } });
         if (!user) return null;
         const ok = await bcrypt.compare(String(credentials.password), user.passwordHash);
         if (!ok) return null;
 
-        const adminEnv = process.env.ADMIN_EMAIL?.toLowerCase().trim();
-        if (adminEnv && email === adminEnv) {
+        const adminEnv = process.env.ADMIN_USERNAME?.toLowerCase().trim();
+        if (adminEnv && username === adminEnv) {
           await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
         }
 
         const u = await prisma.user.findUniqueOrThrow({
           where: { id: user.id },
-          select: { id: true, email: true, isAdmin: true },
+          select: { id: true, username: true, isAdmin: true },
         });
-        return { id: u.id, email: u.email, isAdmin: u.isAdmin };
+        return { id: u.id, username: u.username, isAdmin: u.isAdmin };
       },
     }),
   ],
@@ -41,16 +41,16 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
-        token.email = user.email ?? undefined;
+        token.username = (user as { username?: string }).username ?? undefined;
         token.isAdmin = Boolean((user as { isAdmin?: boolean }).isAdmin);
       }
       if (trigger === "update" && token.id) {
         const u = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { email: true, isAdmin: true },
+          select: { username: true, isAdmin: true },
         });
         if (u) {
-          token.email = u.email ?? undefined;
+          token.username = u.username;
           token.isAdmin = u.isAdmin;
         }
       }
@@ -59,7 +59,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        if (token.email) session.user.email = token.email as string;
+        if (token.username) session.user.username = token.username as string;
         session.user.isAdmin = Boolean(token.isAdmin);
       }
       return session;

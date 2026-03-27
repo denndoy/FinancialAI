@@ -4,7 +4,8 @@ import sharp from "sharp";
 import { authOptions } from "@/lib/auth";
 import { classifyTransaction } from "@/lib/ai";
 import { uploadReceiptImage } from "@/lib/azure";
-import { runOcr } from "@/lib/ocr";
+import { estimateReceiptFieldConfidence } from "@/lib/ocr-field-confidence";
+import { runOcrFromBuffer, runOcrFromImageUrl } from "@/lib/ocr";
 import { parseReceiptText } from "@/lib/parser";
 
 export const runtime = "nodejs";
@@ -58,17 +59,29 @@ export async function POST(req: Request) {
     let ocrError: string | null = null;
 
     try {
-      const ocr = await runOcr(buffer);
+      const ocr = await runOcrFromImageUrl(imageUrl);
       ocrText = ocr.text;
       ocrConfidence = ocr.confidence;
-    } catch (e) {
-      console.error("OCR failed", e);
-      ocrError =
-        "OCR could not read this image. You can still enter amount, date, and merchant manually.";
+    } catch (urlErr) {
+      try {
+        const fallback = await runOcrFromBuffer(buffer);
+        ocrText = fallback.text;
+        ocrConfidence = fallback.confidence;
+      } catch (bufferErr) {
+        console.error("OCR failed for URL and binary", { urlErr, bufferErr });
+        ocrError =
+          "OCR could not read this image. You can still enter amount, date, and merchant manually.";
+      }
     }
 
     const parsed = parseReceiptText(ocrText || "");
-    const category = classifyTransaction(ocrText);
+    const category = classifyTransaction(ocrText || parsed.merchant || "");
+    const fieldConfidence = estimateReceiptFieldConfidence({
+      parsed,
+      category,
+      ocrText,
+      ocrConfidence,
+    });
 
     return NextResponse.json({
       imageUrl,
@@ -82,7 +95,10 @@ export async function POST(req: Request) {
         date: parsed.date ? parsed.date.toISOString() : null,
         merchant: parsed.merchant,
         category,
+        products: parsed.products,
+        fieldConfidence,
       },
+      fallback: Boolean(ocrError),
     });
   } catch (e) {
     console.error(e);
