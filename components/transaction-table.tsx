@@ -17,6 +17,11 @@ export function TransactionTable({ transactions, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => transactions.some((tx) => tx.id === id)));
+  }, [transactions]);
 
   useEffect(() => {
     if (!previewImage) return;
@@ -53,13 +58,64 @@ export function TransactionTable({ transactions, onChanged }: Props) {
     }
   }
 
+  async function removeSelected() {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`${tr("tx.confirmDeleteSelected")} (${selectedIds.length})`)) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const idsToDelete = [...selectedIds];
+      const results = await Promise.all(idsToDelete.map((id) => fetch(`/api/transactions/${id}`, { method: "DELETE" })));
+      if (results.some((res) => !res.ok)) throw new Error("Bulk delete failed");
+      setSelectedIds([]);
+      onChanged();
+    } catch {
+      setError(tr("tx.couldNotDeleteSelected"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const allSelected = transactions.length > 0 && selectedIds.length === transactions.length;
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          {selectedIds.length > 0
+            ? `${selectedIds.length} ${tr("tx.selected")}`
+            : tr("tx.noSelected")}
+        </p>
+        <button
+          type="button"
+          disabled={loading || selectedIds.length === 0}
+          onClick={() => void removeSelected()}
+          className="rounded-lg border border-destructive/40 px-3 py-1.5 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? tr("tx.deletingSelected") : tr("tx.deleteSelected")}
+        </button>
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-muted/50 text-muted-foreground">
             <tr>
+              <th className="px-4 py-3 font-medium">
+                <input
+                  type="checkbox"
+                  aria-label={tr("tx.selectAll")}
+                  checked={allSelected}
+                  disabled={loading || transactions.length === 0}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      setSelectedIds(transactions.map((tx) => tx.id));
+                      return;
+                    }
+                    setSelectedIds([]);
+                  }}
+                />
+              </th>
               <th className="px-4 py-3 font-medium">{tr("tx.table.date")}</th>
               <th className="px-4 py-3 font-medium">{tr("tx.table.description")}</th>
               <th className="px-4 py-3 font-medium">{tr("tx.table.category")}</th>
@@ -72,6 +128,20 @@ export function TransactionTable({ transactions, onChanged }: Props) {
           <tbody>
             {transactions.map((tx) => (
               <tr key={tx.id} className="border-t border-border hover:bg-muted/30">
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    aria-label={tr("tx.selectOne")}
+                    checked={selectedIds.includes(tx.id)}
+                    disabled={loading}
+                    onChange={(event) => {
+                      setSelectedIds((prev) => {
+                        if (event.target.checked) return [...prev, tx.id];
+                        return prev.filter((id) => id !== tx.id);
+                      });
+                    }}
+                  />
+                </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {new Date(tx.date).toLocaleDateString(locale === "id" ? "id-ID" : "en-GB")}
                 </td>
