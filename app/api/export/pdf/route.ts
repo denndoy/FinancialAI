@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { getServerSession } from "next-auth";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
+import sharp from "sharp";
 import { authOptions } from "@/lib/auth";
 import { formatIdr } from "@/lib/format-idr";
 import { getMonthlyDashboardData, monthBounds, resolveMonthQuery } from "@/lib/month-report";
@@ -32,10 +35,50 @@ function finalY(doc: jsPDF): number {
   return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 }
 
+const BRAND_LOGO_CANDIDATES = ["fi-logo-transparent.png", "logo.png", "icon-512.png"] as const;
+
+async function buildBrandLogoDataUrl(): Promise<string | null> {
+  for (const fileName of BRAND_LOGO_CANDIDATES) {
+    try {
+      const filePath = path.join(process.cwd(), "public", fileName);
+      const raw = await readFile(filePath);
+      const png = await sharp(raw)
+        .rotate()
+        .resize(220, 220, { fit: "inside", withoutEnlargement: true })
+        .png({ compressionLevel: 9 })
+        .toBuffer();
+      return `data:image/png;base64,${png.toString("base64")}`;
+    } catch {
+      // Try next candidate.
+    }
+  }
+  return null;
+}
+
+async function buildReceiptPngDataUrl(imageUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(imageUrl, { cache: "no-store" });
+    if (!res.ok) return null;
+    const ab = await res.arrayBuffer();
+    const src = Buffer.from(ab);
+
+    // Convert any source format to PNG so jsPDF can embed it consistently.
+    const png = await sharp(src)
+      .rotate()
+      .resize(240, 240, { fit: "inside", withoutEnlargement: true })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+
+    return `data:image/png;base64,${png.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 function drawFinanceAiLogo(doc: jsPDF, x: number, y: number) {
   doc.setFillColor(...BRAND.accent);
   doc.circle(x, y, 1.9, "F");
-  doc.setFillColor(...BRAND.white);
+  doc.setFillColor(...BRAND.navy);
   doc.circle(x + 4, y, 1.2, "F");
 
   doc.setDrawColor(...BRAND.accent);
@@ -44,7 +87,7 @@ function drawFinanceAiLogo(doc: jsPDF, x: number, y: number) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
-  doc.setTextColor(...BRAND.white);
+  doc.setTextColor(...BRAND.navy);
   doc.text("Finance", x + 6.5, y + 1);
 
   const financeTextWidth = doc.getTextWidth("Finance");
@@ -52,28 +95,53 @@ function drawFinanceAiLogo(doc: jsPDF, x: number, y: number) {
   doc.text("AI", x + 6.5 + financeTextWidth + 0.8, y + 1);
 }
 
-function drawHeaderBlock(doc: jsPDF, periodLabel: string, username: string | null, printedAt: string): number {
+function drawHeaderBlock(
+  doc: jsPDF,
+  periodLabel: string,
+  username: string | null,
+  printedAt: string,
+  brandLogoDataUrl: string | null
+): number {
   const blockY = MARGIN;
-  const blockH = 26;
+  const blockH = 30;
 
-  doc.setFillColor(...BRAND.navy);
-  doc.roundedRect(MARGIN, blockY, CONTENT_W, blockH, 3, 3, "F");
+  doc.setFillColor(...BRAND.white);
+  doc.setDrawColor(...BRAND.line);
+  doc.roundedRect(MARGIN, blockY, CONTENT_W, blockH, 3, 3, "FD");
 
-  doc.setTextColor(...BRAND.white);
-  drawFinanceAiLogo(doc, MARGIN + CONTENT_W - 44, blockY + 7.2);
+  if (brandLogoDataUrl) {
+    const logoSize = 10;
+    const gap = 2;
+    const brandY = blockY + 11;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    const financeW = doc.getTextWidth("Finance");
+    const aiW = doc.getTextWidth("AI");
+    const totalW = logoSize + gap + financeW + aiW;
+    const startX = MARGIN + CONTENT_W - 4 - totalW;
 
-  doc.setTextColor(...BRAND.white);
+    doc.addImage(brandLogoDataUrl, "PNG", startX, blockY + 5, logoSize, logoSize);
+    const textX = startX + logoSize + gap;
+    doc.setTextColor(...BRAND.navy);
+    doc.text("Finance", textX, brandY);
+    doc.setTextColor(...BRAND.accent);
+    doc.text("AI", textX + financeW, brandY);
+  } else {
+    drawFinanceAiLogo(doc, MARGIN + CONTENT_W - 44, blockY + 7.2);
+  }
+
+  doc.setTextColor(...BRAND.navy);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("Laporan Keuangan Bulanan", MARGIN + 4, blockY + 9);
+  doc.text("LAPORAN KEUANGAN", MARGIN + 4, blockY + 9);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
+  doc.setTextColor(...BRAND.slate);
   doc.text(`Periode: ${periodLabel}`, MARGIN + 4, blockY + 15);
   if (username) {
     doc.text(`Pengguna: ${username}`, MARGIN + 4, blockY + 20);
   }
-  doc.text(`Dicetak: ${printedAt}`, MARGIN + CONTENT_W - 4, blockY + 20, { align: "right" });
 
   doc.setTextColor(...BRAND.navy);
   return blockY + blockH + 8;
@@ -157,7 +225,8 @@ export async function GET(req: Request) {
       subject: "Laporan keuangan",
     });
 
-    let y = drawHeaderBlock(doc, periodLabel, session.user.username ?? null, printedAt);
+    const brandLogoDataUrl = await buildBrandLogoDataUrl();
+    let y = drawHeaderBlock(doc, periodLabel, session.user.username ?? null, printedAt, brandLogoDataUrl);
     y = drawSummaryCards(doc, y, data.summary);
 
     if (data.insights.length > 0) {
@@ -189,7 +258,7 @@ export async function GET(req: Request) {
     }
 
     if (data.pie.length > 0) {
-      y = drawSectionTitle(doc, y, "Komposisi Pengeluaran per Kategori");
+      y = drawSectionTitle(doc, y, "Pengeluaran per Kategori");
 
       const catBody = [...data.pie]
         .sort((a, b) => b.value - a.value)
@@ -224,26 +293,35 @@ export async function GET(req: Request) {
 
     y = drawSectionTitle(doc, y, "Detail Transaksi");
 
-    const txBody = data.transactions.map((t) => {
-      const amt = Number(t.amount.toString());
-      const typeLabel = t.type === "INCOME" ? "Pemasukan" : "Pengeluaran";
-      return [
-        format(t.date, "d MMM yyyy", { locale: id }),
-        trunc(t.description, 42),
-        t.type === "EXPENSE" ? trunc(t.category?.trim() || "—", 16) : "—",
-        typeLabel,
-        formatIdr(amt),
-      ];
-    });
+    const txRows = await Promise.all(
+      data.transactions.map(async (t) => {
+        const amt = Number(t.amount.toString());
+        const typeLabel = t.type === "INCOME" ? "Pemasukan" : "Pengeluaran";
+        const receiptPngDataUrl = t.imageUrl ? await buildReceiptPngDataUrl(t.imageUrl) : null;
+
+        return {
+          cells: [
+            format(t.date, "d MMM yyyy", { locale: id }),
+            trunc(t.description, 34),
+            t.type === "EXPENSE" ? trunc(t.category?.trim() || "—", 14) : "—",
+            typeLabel,
+            formatIdr(amt),
+            receiptPngDataUrl ? "" : "—",
+          ],
+          hasReceipt: Boolean(receiptPngDataUrl),
+          receiptPngDataUrl,
+        };
+      })
+    );
 
     const txBodyRows =
-      txBody.length > 0
-        ? txBody
+      txRows.length > 0
+        ? txRows.map((r) => r.cells)
         : [
             [
               {
                 content: "Belum ada transaksi pada periode ini",
-                colSpan: 5,
+                colSpan: 6,
                 styles: {
                   halign: "center" as const,
                   textColor: BRAND.slate,
@@ -254,7 +332,7 @@ export async function GET(req: Request) {
 
     autoTable(doc, {
       startY: y,
-      head: [["Tanggal", "Deskripsi", "Kategori", "Jenis", "Jumlah"]],
+      head: [["Tanggal", "Deskripsi", "Kategori", "Jenis", "Jumlah", "Struk/Bukti"]],
       body: txBodyRows,
       theme: "striped",
       headStyles: {
@@ -272,15 +350,38 @@ export async function GET(req: Request) {
         lineWidth: 0.1,
       },
       columnStyles: {
-        0: { cellWidth: 24 },
-        1: { cellWidth: 72 },
-        2: { cellWidth: 24 },
-        3: { cellWidth: 24, fontStyle: "bold" },
-        4: { halign: "right", cellWidth: 38, fontStyle: "bold" },
+        0: { cellWidth: 20 },
+        1: { cellWidth: 54 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 22, fontStyle: "bold" },
+        4: { halign: "right", cellWidth: 32, fontStyle: "bold" },
+        5: { cellWidth: 32, halign: "center" },
       },
       margin: { left: MARGIN, right: MARGIN },
       tableWidth: CONTENT_W,
       showHead: "everyPage",
+      didParseCell: (hookData) => {
+        if (hookData.section !== "body" || hookData.column.index !== 5) return;
+        const txRow = txRows[hookData.row.index];
+        if (txRow?.hasReceipt) {
+          hookData.cell.styles.minCellHeight = 18;
+          hookData.cell.text = [];
+        }
+      },
+      didDrawCell: (hookData) => {
+        if (hookData.section !== "body" || hookData.column.index !== 5) return;
+        const txRow = txRows[hookData.row.index];
+        if (!txRow?.receiptPngDataUrl) return;
+
+        const padding = 1;
+        const targetH = Math.max(hookData.cell.height - padding * 2, 1);
+        const targetW = Math.max(hookData.cell.width - padding * 2, 1);
+        const side = Math.min(targetW, targetH);
+        const x = hookData.cell.x + (hookData.cell.width - side) / 2;
+        const yCell = hookData.cell.y + (hookData.cell.height - side) / 2;
+
+        doc.addImage(txRow.receiptPngDataUrl, "PNG", x, yCell, side, side);
+      },
     });
 
     drawFooters(doc, printedAt);
