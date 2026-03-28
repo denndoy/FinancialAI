@@ -40,7 +40,7 @@ export function Nav() {
         <div className="flex items-center justify-between gap-4">
           <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
             <Image
-              src="/logo.png"
+              src="/fi-logo-transparent.png"
               alt="FinanceAI logo"
               width={28}
               height={28}

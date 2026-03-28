@@ -42,7 +42,7 @@ export function LoginForm() {
     <div className="mx-auto max-w-md space-y-8">
       <div className="space-y-3">
         <Image
-          src="/logo.png"
+          src="/fi-logo-transparent.png"
           alt="FinanceAI logo"
           width={56}
           height={56}
