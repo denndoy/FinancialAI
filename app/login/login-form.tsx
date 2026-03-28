@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -39,7 +40,15 @@ export function LoginForm() {
 
   return (
     <div className="mx-auto max-w-md space-y-8">
-      <div>
+      <div className="space-y-3">
+        <Image
+          src="/logo.png"
+          alt="FinanceAI logo"
+          width={56}
+          height={56}
+          className="rounded-xl"
+          priority
+        />
         <h1 className="text-2xl font-semibold tracking-tight">{t("login.title")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t("login.subtitle")}</p>
         <p className="mt-1 text-xs text-muted-foreground">{t("login.sessionHint")}</p>

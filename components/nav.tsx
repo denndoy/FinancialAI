@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -37,8 +38,18 @@ export function Nav() {
     <header className="border-b border-border bg-card/80 backdrop-blur">
       <div className="mx-auto max-w-6xl px-4 py-4">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/dashboard" className="text-lg font-semibold tracking-tight text-foreground">
-            Finance<span className="text-primary">AI</span>
+          <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
+            <Image
+              src="/logo.png"
+              alt="FinanceAI logo"
+              width={28}
+              height={28}
+              className="rounded-md"
+              priority
+            />
+            <span>
+              Finance<span className="text-primary">AI</span>
+            </span>
           </Link>
 
           <div className="flex items-center gap-2 md:hidden">
