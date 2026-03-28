@@ -10,6 +10,12 @@ const CATEGORIES = [
   { value: "Transport", labelKey: "category.transport" },
   { value: "Shopping", labelKey: "category.shopping" },
   { value: "Bills", labelKey: "category.bills" },
+  { value: "Housing", labelKey: "category.housing" },
+  { value: "Health", labelKey: "category.health" },
+  { value: "Education", labelKey: "category.education" },
+  { value: "PersonalCare", labelKey: "category.personalCare" },
+  { value: "Travel", labelKey: "category.travel" },
+  { value: "Insurance", labelKey: "category.insurance" },
   { value: "Entertainment", labelKey: "category.entertainment" },
   { value: "Other", labelKey: "category.other" },
 ] as const;

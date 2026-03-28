@@ -8,6 +8,12 @@ export type Category =
   | "Transport"
   | "Shopping"
   | "Bills"
+  | "Housing"
+  | "Health"
+  | "Education"
+  | "PersonalCare"
+  | "Travel"
+  | "Insurance"
   | "Entertainment"
   | "Other";
 
@@ -119,6 +125,96 @@ const KEYWORD_MAP: { category: Category; keywords: string[] }[] = [
       "air pdam",
       "pdam",
       "token listrik",
+    ],
+  },
+  {
+    category: "Housing",
+    keywords: [
+      "sewa",
+      "rent",
+      "kontrakan",
+      "kos",
+      "apartment",
+      "apartemen",
+      "service charge",
+      "maintenance",
+      "ipl",
+      "perumahan",
+    ],
+  },
+  {
+    category: "Health",
+    keywords: [
+      "klinik",
+      "clinic",
+      "rumah sakit",
+      "hospital",
+      "dokter",
+      "apotek",
+      "pharmacy",
+      "obat",
+      "medical",
+      "lab",
+    ],
+  },
+  {
+    category: "Education",
+    keywords: [
+      "sekolah",
+      "school",
+      "kampus",
+      "kuliah",
+      "kursus",
+      "course",
+      "les",
+      "buku",
+      "tuition",
+      "education",
+    ],
+  },
+  {
+    category: "PersonalCare",
+    keywords: [
+      "salon",
+      "barber",
+      "potong rambut",
+      "skincare",
+      "kosmetik",
+      "toiletries",
+      "spa",
+      "perawatan",
+      "body care",
+      "grooming",
+    ],
+  },
+  {
+    category: "Travel",
+    keywords: [
+      "hotel",
+      "flight",
+      "pesawat",
+      "tiket",
+      "travel",
+      "booking",
+      "airbnb",
+      "penginapan",
+      "trip",
+      "liburan",
+    ],
+  },
+  {
+    category: "Insurance",
+    keywords: [
+      "asuransi",
+      "insurance",
+      "premi",
+      "policy",
+      "polis",
+      "bpjs kesehatan",
+      "bpjs ketenagakerjaan",
+      "prudential",
+      "allianz",
+      "axa",
     ],
   },
   {
