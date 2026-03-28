@@ -18,5 +18,6 @@ declare module "next-auth/jwt" {
     id?: string;
     username?: string;
     isAdmin?: boolean;
+    rememberMe?: boolean;
   }
 }

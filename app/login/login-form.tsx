@@ -13,6 +13,7 @@ export function LoginForm() {
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,6 +25,7 @@ export function LoginForm() {
     const res = await signIn("credentials", {
       username,
       password,
+      rememberMe: rememberMe ? "true" : "false",
       redirect: false,
     });
     setLoading(false);
@@ -40,6 +42,7 @@ export function LoginForm() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{t("login.title")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t("login.subtitle")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("login.sessionHint")}</p>
       </div>
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -111,6 +114,15 @@ export function LoginForm() {
               )}
             </button>
           </div>
+        </label>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-border"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+          />
+          <span>{t("login.rememberMe")}</span>
         </label>
         <button
           type="submit"

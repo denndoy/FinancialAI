@@ -3,11 +3,16 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./db";
 
-/** Sesi login berlaku 10 menit; setelah itu pengguna harus masuk lagi. */
+/**
+ * Sesi login persisten per device/browser agar pengguna tidak perlu login berulang.
+ * Tetap ada batas waktu untuk keamanan.
+ */
 const TEN_MINUTES = 10 * 60;
+const THIRTY_DAYS = 30 * 24 * 60 * 60;
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt", maxAge: TEN_MINUTES },
+  session: { strategy: "jwt", maxAge: THIRTY_DAYS, updateAge: 24 * 60 * 60 },
+  jwt: { maxAge: THIRTY_DAYS },
   pages: { signIn: "/login" },
   providers: [
     CredentialsProvider({
@@ -15,10 +20,12 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember Me", type: "text" },
       },
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
         const username = String(credentials.username).trim().toLowerCase();
+        const rememberMe = String(credentials.rememberMe ?? "true") === "true";
         const user = await prisma.user.findUnique({ where: { username } });
         if (!user) return null;
         const ok = await bcrypt.compare(String(credentials.password), user.passwordHash);
@@ -33,7 +40,7 @@ export const authOptions: NextAuthOptions = {
           where: { id: user.id },
           select: { id: true, username: true, isAdmin: true },
         });
-        return { id: u.id, username: u.username, isAdmin: u.isAdmin };
+        return { id: u.id, username: u.username, isAdmin: u.isAdmin, rememberMe };
       },
     }),
   ],
@@ -43,6 +50,12 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.username = (user as { username?: string }).username ?? undefined;
         token.isAdmin = Boolean((user as { isAdmin?: boolean }).isAdmin);
+        token.rememberMe = Boolean((user as { rememberMe?: boolean }).rememberMe);
+        const sessionAge = token.rememberMe ? THIRTY_DAYS : TEN_MINUTES;
+        token.exp = Math.floor(Date.now() / 1000) + sessionAge;
+      }
+      if (typeof token.rememberMe === "undefined") {
+        token.rememberMe = true;
       }
       if (trigger === "update" && token.id) {
         const u = await prisma.user.findUnique({
