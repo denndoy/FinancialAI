@@ -39,6 +39,7 @@ export default function UploadReceiptPage() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -158,6 +159,7 @@ export default function UploadReceiptPage() {
   async function saveTransaction() {
     setSaving(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const descTrimmed = description.trim();
@@ -220,9 +222,10 @@ export default function UploadReceiptPage() {
         return;
       }
 
+      setSuccess(t("scan.success"));
       setTimeout(() => {
         window.location.href = "/dashboard";
-      }, 500);
+      }, 700);
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : t("scan.errorUnknown");
       setError(`${t("scan.errorSavePrefix")} ${errorMsg}`);
@@ -302,6 +305,7 @@ export default function UploadReceiptPage() {
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <h2 className="text-lg font-medium">{t("scan.reviewTitle")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{t("scan.reviewSubtitle")}</p>
+        {success && <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <label className="text-sm sm:col-span-2">
             <span className="flex items-center gap-2 text-muted-foreground">

@@ -10,14 +10,21 @@ type Props = {
   onChanged: () => void;
 };
 
+type DeleteDialogState =
+  | { mode: "single"; id: string }
+  | { mode: "bulk"; ids: string[] }
+  | null;
+
 export function TransactionTable({ transactions, onChanged }: Props) {
   const { t: tr, locale } = useLocale();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => transactions.some((tx) => tx.id === id)));
@@ -43,36 +50,38 @@ export function TransactionTable({ transactions, onChanged }: Props) {
     };
   }, [previewImage]);
 
-  async function remove(id: string) {
-    if (!confirm(tr("tx.confirmDelete"))) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      onChanged();
-    } catch {
-      setError(tr("tx.couldNotDelete"));
-    } finally {
-      setLoading(false);
-    }
+  function remove(id: string) {
+    setDeleteDialog({ mode: "single", id });
   }
 
-  async function removeSelected() {
+  function removeSelected() {
     if (selectedIds.length === 0) return;
-    if (!confirm(`${tr("tx.confirmDeleteSelected")} (${selectedIds.length})`)) return;
+    setDeleteDialog({ mode: "bulk", ids: [...selectedIds] });
+  }
 
+  async function confirmDelete() {
+    if (!deleteDialog) return;
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
-      const idsToDelete = [...selectedIds];
-      const results = await Promise.all(idsToDelete.map((id) => fetch(`/api/transactions/${id}`, { method: "DELETE" })));
-      if (results.some((res) => !res.ok)) throw new Error("Bulk delete failed");
-      setSelectedIds([]);
+      if (deleteDialog.mode === "single") {
+        const res = await fetch(`/api/transactions/${deleteDialog.id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Delete failed");
+        setSelectedIds((prev) => prev.filter((id) => id !== deleteDialog.id));
+        setSuccess(tr("tx.deleteSuccessSingle"));
+      } else {
+        const idsToDelete = [...deleteDialog.ids];
+        const results = await Promise.all(idsToDelete.map((id) => fetch(`/api/transactions/${id}`, { method: "DELETE" })));
+        if (results.some((res) => !res.ok)) throw new Error("Bulk delete failed");
+        setSelectedIds([]);
+        setSuccess(tr("tx.deleteSuccessBulk").replace("{count}", String(idsToDelete.length)));
+      }
       onChanged();
     } catch {
-      setError(tr("tx.couldNotDeleteSelected"));
+      setError(deleteDialog.mode === "single" ? tr("tx.couldNotDelete") : tr("tx.couldNotDeleteSelected"));
     } finally {
+      setDeleteDialog(null);
       setLoading(false);
     }
   }
@@ -91,13 +100,14 @@ export function TransactionTable({ transactions, onChanged }: Props) {
           <button
             type="button"
             disabled={loading}
-            onClick={() => void removeSelected()}
+            onClick={removeSelected}
             className="rounded-lg border border-destructive/40 px-3 py-1.5 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? tr("tx.deletingSelected") : tr("tx.deleteSelected")}
           </button>
         )}
       </div>
+      {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[640px] text-left text-sm">
@@ -188,7 +198,11 @@ export function TransactionTable({ transactions, onChanged }: Props) {
                   <button
                     type="button"
                     disabled={loading}
-                    onClick={() => setEditingId(editingId === tx.id ? null : tx.id)}
+                    onClick={() => {
+                      setError(null);
+                      setSuccess(null);
+                      setEditingId(editingId === tx.id ? null : tx.id);
+                    }}
                     className="mr-2 text-primary hover:underline"
                   >
                     {editingId === tx.id ? tr("tx.close") : tr("tx.edit")}
@@ -213,9 +227,42 @@ export function TransactionTable({ transactions, onChanged }: Props) {
           onCancel={() => setEditingId(null)}
           onSaved={() => {
             setEditingId(null);
+            setError(null);
+            setSuccess(tr("tx.edit.saveSuccess"));
             onChanged();
           }}
         />
+      )}
+
+      {deleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl">
+            <h3 className="text-base font-semibold">{tr("tx.deleteDialog.title")}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {deleteDialog.mode === "single"
+                ? tr("tx.deleteDialog.singleBody")
+                : tr("tx.deleteDialog.bulkBody").replace("{count}", String(deleteDialog.ids.length))}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => setDeleteDialog(null)}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm"
+              >
+                {tr("tx.deleteDialog.cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void confirmDelete()}
+                className="rounded-lg bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground disabled:opacity-60"
+              >
+                {loading ? tr("tx.deleteDialog.deleting") : tr("tx.deleteDialog.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {previewImage && (

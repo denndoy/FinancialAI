@@ -33,6 +33,7 @@ export default function AddTransactionPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -61,6 +62,7 @@ export default function AddTransactionPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       let imageUrl: string | null = null;
 
@@ -110,8 +112,11 @@ export default function AddTransactionPage() {
         setError(msg);
         return;
       }
-      router.push("/dashboard");
-      router.refresh();
+      setSuccess(t("addTx.success"));
+      setTimeout(() => {
+        router.push("/dashboard");
+        router.refresh();
+      }, 700);
     } catch {
       setError(t("addTx.errorRequest"));
     } finally {
@@ -128,6 +133,7 @@ export default function AddTransactionPage() {
       </div>
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-sm">
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {success && <p className="text-sm text-emerald-600 dark:text-emerald-400">{success}</p>}
         <label className="block text-sm">
           <span className="text-muted-foreground">{t("addTx.description")}</span>
           <input
